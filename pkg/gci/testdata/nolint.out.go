@@ -3,9 +3,7 @@ package main
 import (
 	"fmt"
 
-	//nolint:depguard
-	"github.com/forbidden/pkg"
+	"github.com/forbidden/pkg" //nolint:depguard
 
-	//nolint:depguard
-	_ "github.com/daixiang0/gci"
+	_ "github.com/daixiang0/gci" //nolint:depguard
 )

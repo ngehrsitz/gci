@@ -3,8 +3,7 @@ package main
 import (
 	"fmt"
 
-	// golang
-	"github.com/golang"
+	"github.com/golang" // golang
 
 	alias "github.com/daixiang0/gci"
 )

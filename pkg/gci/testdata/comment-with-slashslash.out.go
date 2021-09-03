@@ -1,6 +1,5 @@
 package main
 
 import (
-	// https://pkg.go.dev/fmt
-	"fmt"
+	"fmt" // https://pkg.go.dev/fmt
 )

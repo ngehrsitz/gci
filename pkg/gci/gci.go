@@ -44,9 +44,10 @@ type importSpec struct {
 }
 
 type importBlock struct {
-	list    map[PkgType][]string
-	comment map[string]string
-	alias   map[string]string
+	list          map[PkgType][]string
+	aboveComment  map[string]string
+	inlineComment map[string]string
+	alias         map[string]string
 }
 
 // ParseLocalFlag takes a comma-separated list of
@@ -59,9 +60,10 @@ func ParseLocalFlag(str string) []string {
 
 func newImportBlock(data [][]byte, localFlag []string) *importBlock {
 	p := &importBlock{
-		list:    make(map[PkgType][]string),
-		comment: make(map[string]string),
-		alias:   make(map[string]string),
+		list:          make(map[PkgType][]string),
+		aboveComment:  make(map[string]string),
+		inlineComment: make(map[string]string),
+		alias:         make(map[string]string),
 	}
 
 	formatData := make([]string, 0)
@@ -76,34 +78,23 @@ func newImportBlock(data [][]byte, localFlag []string) *importBlock {
 	for i := n - 1; i >= 0; i-- {
 		line := formatData[i]
 
-		// check commentFlag:
-		// 1. one line commentFlag
-		// 2. commentFlag after import path
-		commentIndex := strings.Index(line, commentFlag)
-		if commentIndex == 0 {
+		if strings.HasPrefix(line, commentFlag) {
 			// comment in the last line is useless, ignore it
 			if i+1 >= n {
 				continue
 			}
-			spec := parseImportSpec(formatData[i+1], strings.Index(formatData[i+1], commentFlag) >= 0)
-			p.comment[spec.path] = line
-			continue
-		} else if commentIndex > 0 {
-			spec := parseImportSpec(line, true)
-			if spec.alias != "" {
-				p.alias[spec.path] = spec.alias
-			}
-
-			p.comment[spec.path] = spec.comment
-			pkgType := getPkgType(spec.path, localFlag)
-			p.list[pkgType] = append(p.list[pkgType], spec.path)
+			spec := parseImportSpec(formatData[i+1])
+			p.aboveComment[spec.path] = line
 			continue
 		}
 
-		spec := parseImportSpec(line, false)
+		spec := parseImportSpec(line)
 
 		if spec.alias != "" {
 			p.alias[spec.path] = spec.alias
+		}
+		if spec.comment != "" {
+			p.inlineComment[spec.path] = spec.comment
 		}
 
 		pkgType := getPkgType(spec.path, localFlag)
@@ -126,18 +117,21 @@ func (p *importBlock) fmt() []byte {
 		}
 		sort.Strings(p.list[pkgType])
 		for _, s := range p.list[pkgType] {
-			if p.comment[s] != "" {
+			if p.aboveComment[s] != "" {
 				if len(lines) > 0 && lines[len(lines)-1] != "" {
 					lines = append(lines, "")
 				}
-				lines = append(lines, indent+p.comment[s])
+				lines = append(lines, indent+p.aboveComment[s])
 			}
 
+			line := s
 			if p.alias[s] != "" {
-				lines = append(lines, indent+p.alias[s]+blank+s)
-			} else {
-				lines = append(lines, indent+s)
+				line = p.alias[s] + blank + s
 			}
+			if p.inlineComment[s] != "" {
+				line += blank + p.inlineComment[s]
+			}
+			lines = append(lines, indent+line)
 		}
 	}
 
@@ -145,9 +139,8 @@ func (p *importBlock) fmt() []byte {
 }
 
 // parseImportSpec assumes line is a import path, and returns the (path, alias, comment).
-func parseImportSpec(line string, comment bool) importSpec {
-	if comment {
-		s := strings.SplitN(line, commentFlag, 2)
+func parseImportSpec(line string) importSpec {
+	if s := strings.SplitN(line, commentFlag, 2); len(s) > 1 {
 		pkgArray := strings.Fields(s[0])
 		if len(pkgArray) > 1 {
 			return importSpec{

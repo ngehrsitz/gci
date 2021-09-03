@@ -23,16 +23,13 @@ const (
 )
 
 const (
-	commentFlag = "//"
-)
+	commentFlag     = "//"
+	importStartFlag = "\nimport (\n"
+	importEndFlag   = "\n)\n"
 
-var (
-	importStartFlag = []byte(`
-import (
-`)
-	importEndFlag = []byte(`
-)
-`)
+	blank     = " "
+	indent    = "\t"
+	linebreak = "\n"
 )
 
 type FlagSet struct {
@@ -177,12 +174,6 @@ func getPkgType(line string, localFlag []string) PkgType {
 	return remote
 }
 
-const (
-	blank     = " "
-	indent    = "\t"
-	linebreak = "\n"
-)
-
 func diff(b1, b2 []byte, filename string) (data []byte, err error) {
 	f1, err := writeTempFile("", "gci", b1)
 	if err != nil {
@@ -291,13 +282,13 @@ func processFile(filename string, out io.Writer, set *FlagSet) error {
 
 	ori := make([]byte, len(src))
 	copy(ori, src)
-	start := bytes.Index(src, importStartFlag)
+	start := bytes.Index(src, []byte(importStartFlag))
 	// in case no importStartFlag or importStartFlag exist in the commentFlag
 	if start < 0 {
 		fmt.Printf("skip file %s since no import\n", filename)
 		return nil
 	}
-	end := bytes.Index(src[start:], importEndFlag) + start
+	end := bytes.Index(src[start:], []byte(importEndFlag)) + start
 
 	ret := bytes.Split(src[start+len(importStartFlag):end], []byte(linebreak))
 
@@ -354,12 +345,12 @@ func Run(filename string, set *FlagSet) ([]byte, []byte, error) {
 
 	ori := make([]byte, len(src))
 	copy(ori, src)
-	start := bytes.Index(src, importStartFlag)
+	start := bytes.Index(src, []byte(importStartFlag))
 	// in case no importStartFlag or importStartFlag exist in the commentFlag
 	if start < 0 {
 		return nil, nil, nil
 	}
-	end := bytes.Index(src[start:], importEndFlag) + start
+	end := bytes.Index(src[start:], []byte(importEndFlag)) + start
 
 	// in case import flags are part of a codegen template, or otherwise "wrong"
 	if start+len(importStartFlag) > end {

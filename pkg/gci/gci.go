@@ -40,7 +40,7 @@ type FlagSet struct {
 	DoWrite, DoDiff *bool
 }
 
-type pkg struct {
+type importBlock struct {
 	list    map[PkgType][]string
 	comment map[string]string
 	alias   map[string]string
@@ -54,8 +54,8 @@ func ParseLocalFlag(str string) []string {
 	return strings.FieldsFunc(str, func(c rune) bool { return c == ',' })
 }
 
-func newPkg(data [][]byte, localFlag []string) *pkg {
-	p := &pkg{
+func newImportBlock(data [][]byte, localFlag []string) *importBlock {
+	p := &importBlock{
 		list:    make(map[PkgType][]string),
 		comment: make(map[string]string),
 		alias:   make(map[string]string),
@@ -111,7 +111,7 @@ func newPkg(data [][]byte, localFlag []string) *pkg {
 }
 
 // fmt format import pkgs as expected
-func (p *pkg) fmt() []byte {
+func (p *importBlock) fmt() []byte {
 	var lines []string
 
 	for _, pkgType := range []PkgType{standard, remote, local} {
@@ -301,9 +301,9 @@ func processFile(filename string, out io.Writer, set *FlagSet) error {
 
 	ret := bytes.Split(src[start+len(importStartFlag):end], []byte(linebreak))
 
-	p := newPkg(ret, set.LocalFlag)
+	block := newImportBlock(ret, set.LocalFlag)
 
-	res := append(src[:start+len(importStartFlag)], append(p.fmt(), src[end+1:]...)...)
+	res := append(src[:start+len(importStartFlag)], append(block.fmt(), src[end+1:]...)...)
 
 	if !bytes.Equal(ori, res) {
 		if *set.DoWrite {
@@ -368,9 +368,9 @@ func Run(filename string, set *FlagSet) ([]byte, []byte, error) {
 
 	ret := bytes.Split(src[start+len(importStartFlag):end], []byte(linebreak))
 
-	p := newPkg(ret, set.LocalFlag)
+	block := newImportBlock(ret, set.LocalFlag)
 
-	res := append(src[:start+len(importStartFlag)], append(p.fmt(), src[end+1:]...)...)
+	res := append(src[:start+len(importStartFlag)], append(block.fmt(), src[end+1:]...)...)
 
 	if bytes.Equal(ori, res) {
 		return ori, nil, nil

@@ -43,11 +43,18 @@ type importSpec struct {
 	comment string
 }
 
+type sectionKey struct {
+	Type    PkgType
+	Comment string
+}
+
+type sectionVal struct {
+	imports []importSpec
+	order   int
+}
+
 type importBlock struct {
-	list          map[PkgType][]string
-	aboveComment  map[string][]string
-	inlineComment map[string]string
-	alias         map[string]string
+	sections map[sectionKey]*sectionVal
 }
 
 // ParseLocalFlag takes a comma-separated list of
@@ -58,53 +65,51 @@ func ParseLocalFlag(str string) []string {
 	return strings.FieldsFunc(str, func(c rune) bool { return c == ',' })
 }
 
-func newImportBlock(data [][]byte, localFlag []string) *importBlock {
+func newImportBlock(lines [][]byte, localFlag []string) *importBlock {
 	p := &importBlock{
-		list:          make(map[PkgType][]string),
-		aboveComment:  make(map[string][]string),
-		inlineComment: make(map[string]string),
-		alias:         make(map[string]string),
+		sections: make(map[sectionKey]*sectionVal),
 	}
 
-	formatData := make([]string, 0)
-	// remove all empty lines
-	for _, v := range data {
-		if len(v) > 0 {
-			formatData = append(formatData, strings.TrimSpace(string(v)))
+	curComment := ""
+	prevType := PkgType(-1)
+	order := 1
+	for i := 0; i < len(lines); i++ {
+		line := strings.TrimSpace(string(lines[i]))
+		if line == "" {
+			curComment = ""
+			continue
 		}
-	}
-
-	for i := 0; i < len(formatData); i++ {
-		line := formatData[i]
 
 		if strings.HasPrefix(line, commentFlag) {
-			// Slurp up the entire multi-line comment
-			comment := []string{line}
-			for j := i + 1; j < len(formatData) && strings.HasPrefix(formatData[j], commentFlag); j++ {
-				comment = append(comment, formatData[j])
-				i++
+			if curComment == "" {
+				curComment = indent + line
+			} else {
+				curComment += linebreak + indent + line
 			}
-
-			// comment in the last line is useless, ignore it
-			if i+1 == len(formatData) {
-				continue
-			}
-			spec := parseImportSpec(formatData[i+1])
-			p.aboveComment[spec.path] = comment
+			prevType = -1
 			continue
 		}
 
 		spec := parseImportSpec(line)
 
-		if spec.alias != "" {
-			p.alias[spec.path] = spec.alias
-		}
-		if spec.comment != "" {
-			p.inlineComment[spec.path] = spec.comment
+		curType := getPkgType(spec.path, localFlag)
+		if prevType >= 0 && curType != prevType {
+			curComment = ""
 		}
 
-		pkgType := getPkgType(spec.path, localFlag)
-		p.list[pkgType] = append(p.list[pkgType], spec.path)
+		key := sectionKey{
+			Type:    curType,
+			Comment: curComment,
+		}
+		if _, ok := p.sections[key]; !ok {
+			p.sections[key] = &sectionVal{
+				order: order,
+			}
+			order++
+		}
+		p.sections[key].imports = append(p.sections[key].imports, spec)
+
+		prevType = curType
 	}
 
 	return p
@@ -114,30 +119,40 @@ func newImportBlock(data [][]byte, localFlag []string) *importBlock {
 func (p *importBlock) fmt() []byte {
 	var lines []string
 
-	for _, pkgType := range []PkgType{standard, remote, local} {
-		if len(p.list[pkgType]) == 0 {
+	sectionKeys := make([]sectionKey, 0, len(p.sections))
+	for sectionKey := range p.sections {
+		sectionKeys = append(sectionKeys, sectionKey)
+	}
+	sort.Slice(sectionKeys, func(i, j int) bool {
+		a := sectionKeys[i]
+		b := sectionKeys[j]
+		if a.Type != b.Type {
+			return a.Type < b.Type
+		}
+		return p.sections[a].order < p.sections[b].order
+	})
+
+	for _, sectionKey := range sectionKeys {
+		sectionVal := p.sections[sectionKey]
+		if len(sectionVal.imports) == 0 {
 			continue
 		}
 		if len(lines) > 0 && lines[len(lines)-1] != "" {
 			lines = append(lines, "")
 		}
-		sort.Strings(p.list[pkgType])
-		for _, s := range p.list[pkgType] {
-			if len(p.aboveComment[s]) > 0 {
-				if len(lines) > 0 && lines[len(lines)-1] != "" {
-					lines = append(lines, "")
-				}
-				for _, commentLine := range p.aboveComment[s] {
-					lines = append(lines, indent+commentLine)
-				}
+		if sectionKey.Comment != "" {
+			lines = append(lines, sectionKey.Comment)
+		}
+		sort.Slice(sectionVal.imports, func(i, j int) bool {
+			return sectionVal.imports[i].path < sectionVal.imports[j].path
+		})
+		for _, spec := range sectionVal.imports {
+			line := spec.path
+			if spec.alias != "" {
+				line = spec.alias + blank + line
 			}
-
-			line := s
-			if p.alias[s] != "" {
-				line = p.alias[s] + blank + s
-			}
-			if p.inlineComment[s] != "" {
-				line += blank + p.inlineComment[s]
+			if spec.comment != "" {
+				line += blank + spec.comment
 			}
 			lines = append(lines, indent+line)
 		}

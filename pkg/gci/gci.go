@@ -45,7 +45,7 @@ type importSpec struct {
 
 type importBlock struct {
 	list          map[PkgType][]string
-	aboveComment  map[string]string
+	aboveComment  map[string][]string
 	inlineComment map[string]string
 	alias         map[string]string
 }
@@ -61,7 +61,7 @@ func ParseLocalFlag(str string) []string {
 func newImportBlock(data [][]byte, localFlag []string) *importBlock {
 	p := &importBlock{
 		list:          make(map[PkgType][]string),
-		aboveComment:  make(map[string]string),
+		aboveComment:  make(map[string][]string),
 		inlineComment: make(map[string]string),
 		alias:         make(map[string]string),
 	}
@@ -74,17 +74,23 @@ func newImportBlock(data [][]byte, localFlag []string) *importBlock {
 		}
 	}
 
-	n := len(formatData)
-	for i := n - 1; i >= 0; i-- {
+	for i := 0; i < len(formatData); i++ {
 		line := formatData[i]
 
 		if strings.HasPrefix(line, commentFlag) {
+			// Slurp up the entire multi-line comment
+			comment := []string{line}
+			for j := i + 1; j < len(formatData) && strings.HasPrefix(formatData[j], commentFlag); j++ {
+				comment = append(comment, formatData[j])
+				i++
+			}
+
 			// comment in the last line is useless, ignore it
-			if i+1 >= n {
+			if i+1 == len(formatData) {
 				continue
 			}
 			spec := parseImportSpec(formatData[i+1])
-			p.aboveComment[spec.path] = line
+			p.aboveComment[spec.path] = comment
 			continue
 		}
 
@@ -117,11 +123,13 @@ func (p *importBlock) fmt() []byte {
 		}
 		sort.Strings(p.list[pkgType])
 		for _, s := range p.list[pkgType] {
-			if p.aboveComment[s] != "" {
+			if len(p.aboveComment[s]) > 0 {
 				if len(lines) > 0 && lines[len(lines)-1] != "" {
 					lines = append(lines, "")
 				}
-				lines = append(lines, indent+p.aboveComment[s])
+				for _, commentLine := range p.aboveComment[s] {
+					lines = append(lines, indent+commentLine)
+				}
 			}
 
 			line := s

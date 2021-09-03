@@ -127,5 +127,4 @@ import (
 
 ## TODO
 
-- Support multiple lines of comment in import block
 - Add more testcases

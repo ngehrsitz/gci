@@ -37,6 +37,12 @@ type FlagSet struct {
 	DoWrite, DoDiff *bool
 }
 
+type importSpec struct {
+	alias   string
+	path    string
+	comment string
+}
+
 type importBlock struct {
 	list    map[PkgType][]string
 	comment map[string]string
@@ -79,29 +85,29 @@ func newImportBlock(data [][]byte, localFlag []string) *importBlock {
 			if i+1 >= n {
 				continue
 			}
-			pkg, _, _ := getPkgInfo(formatData[i+1], strings.Index(formatData[i+1], commentFlag) >= 0)
-			p.comment[pkg] = line
+			spec := parseImportSpec(formatData[i+1], strings.Index(formatData[i+1], commentFlag) >= 0)
+			p.comment[spec.path] = line
 			continue
 		} else if commentIndex > 0 {
-			pkg, alias, comment := getPkgInfo(line, true)
-			if alias != "" {
-				p.alias[pkg] = alias
+			spec := parseImportSpec(line, true)
+			if spec.alias != "" {
+				p.alias[spec.path] = spec.alias
 			}
 
-			p.comment[pkg] = comment
-			pkgType := getPkgType(pkg, localFlag)
-			p.list[pkgType] = append(p.list[pkgType], pkg)
+			p.comment[spec.path] = spec.comment
+			pkgType := getPkgType(spec.path, localFlag)
+			p.list[pkgType] = append(p.list[pkgType], spec.path)
 			continue
 		}
 
-		pkg, alias, _ := getPkgInfo(line, false)
+		spec := parseImportSpec(line, false)
 
-		if alias != "" {
-			p.alias[pkg] = alias
+		if spec.alias != "" {
+			p.alias[spec.path] = spec.alias
 		}
 
-		pkgType := getPkgType(pkg, localFlag)
-		p.list[pkgType] = append(p.list[pkgType], pkg)
+		pkgType := getPkgType(spec.path, localFlag)
+		p.list[pkgType] = append(p.list[pkgType], spec.path)
 	}
 
 	return p
@@ -138,22 +144,38 @@ func (p *importBlock) fmt() []byte {
 	return []byte(strings.Join(lines, linebreak) + linebreak)
 }
 
-// getPkgInfo assume line is a import path, and return (path, alias, comment)
-func getPkgInfo(line string, comment bool) (string, string, string) {
+// parseImportSpec assumes line is a import path, and returns the (path, alias, comment).
+func parseImportSpec(line string, comment bool) importSpec {
 	if comment {
 		s := strings.SplitN(line, commentFlag, 2)
 		pkgArray := strings.Fields(s[0])
 		if len(pkgArray) > 1 {
-			return pkgArray[1], pkgArray[0], commentFlag + s[1]
+			return importSpec{
+				path:    pkgArray[1],
+				alias:   pkgArray[0],
+				comment: commentFlag + s[1],
+			}
 		} else {
-			return pkgArray[0], "", commentFlag + s[1]
+			return importSpec{
+				path:    pkgArray[0],
+				alias:   "",
+				comment: commentFlag + s[1],
+			}
 		}
 	} else {
 		pkgArray := strings.Fields(line)
 		if len(pkgArray) > 1 {
-			return pkgArray[1], pkgArray[0], ""
+			return importSpec{
+				path:    pkgArray[1],
+				alias:   pkgArray[0],
+				comment: "",
+			}
 		} else {
-			return pkgArray[0], "", ""
+			return importSpec{
+				path:    pkgArray[0],
+				alias:   "",
+				comment: "",
+			}
 		}
 	}
 }

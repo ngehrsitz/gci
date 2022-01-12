@@ -9,21 +9,15 @@ import (
 )
 
 func init() {
-	SectionParserInst.RegisterSection(PrefixType{})
-}
-
-type PrefixType struct{}
-
-func (p PrefixType) generate(sectionPrefix Section, sectionStr string, sectionSuffix Section) Section {
-	match, prefixParameter := sectionStrMatchesAlias(sectionStr, []string{"prefix", "importprefix"})
-	if match {
-		return Prefix{prefixParameter, sectionPrefix, sectionSuffix}
+	prefixType := &SectionType{
+		generatorFun: func(parameter string, sectionPrefix, sectionSuffix Section) (Section, error) {
+			return Prefix{parameter, sectionPrefix, sectionSuffix}, nil
+		},
+		aliases:       []string{"Prefix", "pkgPrefix"},
+		parameterHelp: "gitlab.com/myorg",
+		description:   "Groups all imports with the specified Prefix. Imports will be matched to the longest Prefix.",
 	}
-	return nil
-}
-
-func (p PrefixType) helpText() string {
-	return "Prefix(gitlab.com/myorg) - Groups all imports with the specified Prefix. Imports will be matched to the longest Prefix."
+	SectionParserInst.RegisterSection(prefixType)
 }
 
 type Prefix struct {

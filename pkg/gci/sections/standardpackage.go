@@ -7,21 +7,14 @@ import (
 )
 
 func init() {
-	SectionParserInst.RegisterSection(StandardPackageType{})
-}
-
-type StandardPackageType struct{}
-
-func (s StandardPackageType) generate(sectionPrefix Section, sectionStr string, sectionSuffix Section) Section {
-	match, _ := sectionStrMatchesAlias(sectionStr, []string{"std", "standard"})
-	if match {
-		return StandardPackage{sectionPrefix, sectionSuffix}
+	standardPackageType := &SectionType{
+		generatorFun: func(parameter string, sectionPrefix, sectionSuffix Section) (Section, error) {
+			return StandardPackage{sectionPrefix, sectionSuffix}, nil
+		},
+		aliases:     []string{"Std", "Standard"},
+		description: "Captures all standard packages if they do not match another section",
 	}
-	return nil
-}
-
-func (s StandardPackageType) helpText() string {
-	return "Std|Standard - Captures all standard packages if they do not match another section"
+	SectionParserInst.RegisterSection(standardPackageType.withoutParameter())
 }
 
 type StandardPackage struct {

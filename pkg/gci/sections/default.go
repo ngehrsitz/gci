@@ -7,21 +7,14 @@ import (
 )
 
 func init() {
-	SectionParserInst.RegisterSection(DefaultSectionType{})
-}
-
-type DefaultSectionType struct{}
-
-func (d DefaultSectionType) generate(sectionPrefix Section, sectionStr string, sectionSuffix Section) Section {
-	match, _ := sectionStrMatchesAlias(sectionStr, []string{"def", "default"})
-	if match {
-		return DefaultSection{sectionPrefix, sectionSuffix}
+	defaultSectionType := &SectionType{
+		generatorFun: func(parameter string, sectionPrefix, sectionSuffix Section) (Section, error) {
+			return DefaultSection{sectionPrefix, sectionSuffix}, nil
+		},
+		aliases:     []string{"Def", "Default"},
+		description: "Contains all imports that could not be matched to another section type",
 	}
-	return nil
-}
-
-func (d DefaultSectionType) helpText() string {
-	return "Def|Default - Contains all imports that could not be matched to another section type"
+	SectionParserInst.RegisterSection(defaultSectionType.withoutParameter())
 }
 
 type DefaultSection struct {

@@ -1,16 +1,44 @@
 package sections
 
 import (
+	"errors"
 	"github.com/daixiang0/gci/pkg/configuration"
 	importPkg "github.com/daixiang0/gci/pkg/gci/imports"
 	"github.com/daixiang0/gci/pkg/gci/specificity"
-	"strings"
 )
 
 // A SectionType is used to dynamically register Sections with the parser
-type SectionType interface {
-	generate(sectionPrefix Section, sectionStr string, sectionSuffix Section) Section
-	helpText() string
+type SectionType struct {
+	generatorFun  func(parameter string, sectionPrefix, sectionSuffix Section) (Section, error)
+	aliases       []string
+	parameterHelp string
+	description   string
+}
+
+func (t *SectionType) withoutParameter() *SectionType {
+	sectionGeneratorFun := t.generatorFun
+	t.generatorFun = func(parameter string, sectionPrefix, sectionSuffix Section) (Section, error) {
+		if parameter != "" {
+			return nil, errors.New("Default section does not take a parameter")
+		}
+		return sectionGeneratorFun(parameter, sectionPrefix, sectionSuffix)
+	}
+	t.parameterHelp = ""
+	return t
+}
+
+func (t *SectionType) standAloneSection() *SectionType {
+	nextFun := t.generatorFun
+	t.generatorFun = func(parameter string, sectionPrefix, sectionSuffix Section) (Section, error) {
+		if sectionPrefix != nil {
+			return nil, errors.New("Section may not contain a Prefix")
+		}
+		if sectionSuffix != nil {
+			return nil, errors.New("Section may not contain a Suffix")
+		}
+		return nextFun(parameter, sectionPrefix, sectionSuffix)
+	}
+	return t
 }
 
 // Section defines a part of the formatted output.
@@ -45,23 +73,4 @@ func inorderSectionFormat(section Section, imports []importPkg.ImportDef, cfg co
 		output += section.sectionSuffix().Format([]importPkg.ImportDef{}, cfg)
 	}
 	return output
-}
-
-// Method used for checking if the string representation of the section matches the expected aliases
-// Parameters in () after the alias are also parsed
-func sectionStrMatchesAlias(str string, sectionAliases []string) (match bool, parameters string) {
-	lowerCaseStr := strings.ToLower(str)
-	for _, alias := range sectionAliases {
-		// str starts with alias
-		if strings.HasPrefix(lowerCaseStr, alias) {
-			leftoverStr := lowerCaseStr[len(alias):]
-			if leftoverStr == "" {
-				return true, ""
-			}
-			if strings.HasPrefix(leftoverStr, "(") && strings.HasSuffix(leftoverStr, ")") {
-				return true, strings.TrimSuffix(strings.TrimPrefix(leftoverStr, "("), ")")
-			}
-		}
-	}
-	return false, ""
 }

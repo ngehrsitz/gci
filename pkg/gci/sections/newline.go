@@ -8,21 +8,14 @@ import (
 )
 
 func init() {
-	SectionParserInst.RegisterSection(NewLineType{})
-}
-
-type NewLineType struct{}
-
-func (n NewLineType) generate(sectionPrefix Section, sectionStr string, sectionSuffix Section) Section {
-	match, _ := sectionStrMatchesAlias(sectionStr, []string{"nl", "newline"})
-	if match {
-		return NewLine{}
+	newLineType := &SectionType{
+		generatorFun: func(parameter string, sectionPrefix, sectionSuffix Section) (Section, error) {
+			return NewLine{}, nil
+		},
+		aliases:     []string{"NL", "NewLine"},
+		description: "Prints an empty line",
 	}
-	return nil
-}
-
-func (n NewLineType) helpText() string {
-	return "NL|NewLine - Prints an empty line"
+	SectionParserInst.RegisterSection(newLineType.standAloneSection().withoutParameter())
 }
 
 type NewLine struct{}

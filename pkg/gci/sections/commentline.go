@@ -9,21 +9,15 @@ import (
 )
 
 func init() {
-	SectionParserInst.RegisterSection(CommentLineType{})
-}
-
-type CommentLineType struct{}
-
-func (c CommentLineType) generate(sectionPrefix Section, sectionStr string, sectionSuffix Section) Section {
-	match, commentParameter := sectionStrMatchesAlias(sectionStr, []string{"comment"})
-	if match {
-		return CommentLine(commentParameter)
+	commentLineType := &SectionType{
+		generatorFun: func(parameter string, sectionPrefix, sectionSuffix Section) (Section, error) {
+			return CommentLine(parameter), nil
+		},
+		aliases:       []string{"Comment", "CommentLine"},
+		parameterHelp: "your text here",
+		description:   "Prints the specified indented comment",
 	}
-	return nil
-}
-
-func (c CommentLineType) helpText() string {
-	return "Comment(your text here) - Prints the specified indented comment"
+	SectionParserInst.RegisterSection(commentLineType.standAloneSection())
 }
 
 type CommentLine string

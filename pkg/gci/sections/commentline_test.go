@@ -14,3 +14,11 @@ func TestCommentLineSpecificity(t *testing.T) {
 	}
 	testSpecificity(t, testCases)
 }
+
+func TestCommentLineGenerator(t *testing.T) {
+	testCases := []sectionTestData{
+		{"commentline", CommentLine("")},
+		{"Commentline(abc)", CommentLine("abc")},
+	}
+	testGenerator(t, testCases)
+}
